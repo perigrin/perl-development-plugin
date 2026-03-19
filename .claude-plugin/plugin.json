@@ -1,0 +1,13 @@
+{
+  "name": "perl-development",
+  "description": "Agentic Perl development — version-aware code generation, Test2 testing, dependency management, static analysis, and regression testing across the production version matrix. PVM is the reference backend; alternative backends are a community contribution path.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Chris Prather"
+  },
+  "homepage": "https://github.com/perigrin/perl-development-plugin",
+  "repository": "https://github.com/perigrin/perl-development-plugin",
+  "license": "Artistic-2.0",
+  "skills": "./skills/",
+  "commands": "./commands/"
+}
