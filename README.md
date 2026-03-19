@@ -10,7 +10,8 @@ perlbrew, custom) are a community contribution path.
 ## Installation
 
 ```
-/install-plugin perl-development@perigrin-marketplace
+/plugin marketplace add perigrin/claude-plugins-marketplace
+/plugin install perl-development
 ```
 
 ## Quick Start
