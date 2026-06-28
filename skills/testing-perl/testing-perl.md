@@ -71,6 +71,10 @@ It is acceptable to mock out subs called by the subroutine being tested in unit/
 It is acceptable to fake external programs called by the subroutine being tested in unit/structural tests.
 It is not acceptable to do either in integration/acceptance tests.
 
+It is never acceptable to mock out the subroutine you are attempting to test, as this invalidates your test case.
+It is not acceptible to read in the file containing the code you are attmpting to test and asserting that
+the contents of the file contain specific content. You are trying to test behavior, not characterize code.
+
 Whenever building a mock of a subroutine, or a fake of an external program,
 it is preferrable to keep this scoped within a closure or subtest to prevent pollution of subsequent test results.
 
