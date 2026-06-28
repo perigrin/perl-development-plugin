@@ -58,6 +58,28 @@ with synthetic inputs is false confidence — real inputs expose bugs that
 synthetic ones miss. Always validate against production-representative
 data before considering a test suite complete.
 
+## Types of testing, and when it is acceptable to run what
+
+Unit/Structural tests exercise the functionality of particular subs in particular perl modules.
+Integration/Acceptance tests do the same, but without mocking anything external to the sub tested.
+
+Anything that is not a unit/structural test must be gated behind either the AUTHOR\_TESTING or RELEASE\_TESTING env var check.
+
+## Mocking, Faking and Scoping
+
+It is acceptable to mock out subs called by the subroutine being tested in unit/structural tests.
+It is acceptable to fake external programs called by the subroutine being tested in unit/structural tests.
+It is not acceptable to do either in integration/acceptance tests.
+
+Whenever building a mock of a subroutine, or a fake of an external program,
+it is preferrable to keep this scoped within a closure or subtest to prevent pollution of subsequent test results.
+
+### Preferred means of making mocks/fakes
+
+1. Test::MockModule - In 'strict' mode to ensure the subs we mock are in fact defined.
+2. Test::MockFile   - When we interact with non-tempfiles, use Test::Mockfile to prevent destructive edits.
+3. DBIX::QuickDB    - When we need to actually test interaction with a DB, use an ephemeral one.
+
 ## Parallel Review Pattern
 
 After each significant implementation phase, run three parallel review agents:
