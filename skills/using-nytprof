@@ -1,0 +1,202 @@
+---
+name: using-nytprof
+description: |
+  Profile and diagnose slow code with
+  Devel::NYTProf, then analyze the report to find the hotspot and
+  propose a fix. Generate a profile by running the page's Perl entry
+  point (generally a .pl script) under -d:NYTProf, render it with
+  nytprofhtml, read the flame graph and per-line costs, and quantify
+  the real-world saving. Use when a user reports a script as is slow,
+  asks "why is this page slow" for a perl CGI or PSGI app,
+  "profile X", "where is the time going", mentions NYTProf / a flame
+  graph, or wants a performance hotspot analyzed in the
+  repo. Always deletes the profile artifacts when done.
+---
+
+# Performance Profiling — NYTProf Skill
+
+Perl code almost always has a Perl script/cgi/psgi entry point that
+processes data. Many things can be done slowly following from there,
+and [Devel::NYTProf](https://metacpan.org/pod/Devel::NYTProf)
+profiles the whole run so the hotspot(s) are visible.
+
+Workflow: generate the profile → render it → find the hotspot → fix →
+re-profile to confirm.
+
+## ⚠️ Security — artifacts embed full source
+
+The `nytprof.out` file **and** the generated HTML report contain the
+complete source of every file touched during the run. Treat them as
+sensitive:
+
+- Write them to a path only privileged users can read (`/tmp` on a dev
+  box is fine; never a web-accessible docroot).
+- **Delete every artifact when you are done** — see
+  [Clean up](#7-clean-up-always). Do not leave `nytprof.out` or the
+  `nytprof/` report directory lying around.
+
+## Prerequisites
+
+- `Devel::NYTProf` installed and `nytprofhtml` available in `$PATH`.
+
+## 1. Identify the entry point for the page
+
+Map the route the user cares about to a Perl invocation:
+```
+/path/to/script.pl arg1 arg2...
+```
+
+## 2. Generate the profile
+
+Pick the mode that matches the context. The pattern is always: set the
+`NYTPROF` env var to `file=<outfile>`, then run the entry
+point under `perl -d:NYTProf`. Point `file=` wherever you want the
+`.out` — you'll `cd` there before rendering. If you want to exclude BEGIN,
+then you could do `start=init:file=<outfile>` as well. This can be useful
+in PSGI contexts where BEGIN usually processes during service startup time
+and not in the context of user requests or when profiling individual
+subroutines in modules.
+
+**Perl/CGI Scripts:**
+
+```bash
+NYTPROF=file=/tmp/nytprof.out \
+  perl -d:NYTProf /path/to/script.pl arg1 >/tmp/page.out 2>/tmp/page.err
+```
+If it is a CGI script, you may need to set CGI vars ahead of time like REMOTE_USER, etc.,
+as you are calling the script outside of the normal webserver's context.
+
+**Perl Modules/PSGI routes:**
+
+Typically PSGI codepaths are encapsulated into modules. This makes profiling
+these very similar to profiling perl modules. In this case you want to identify
+what subroutine corresponds to the path the user takes through the application.
+
+```bash
+NYTPROF=start=init:file=/tmp/nytprof.out \
+  perl -d:NYTProf -MMy::Module -e 'do_something()' >/tmp/page.out 2>/tmp/page.err
+```
+
+**Run script as another user:**
+
+```bash
+export NYTPROF=start=init:file=/home/luser/nytprof.out
+sudo --preserve-env=NYTPROF -u luser \
+  perl -d:NYTProf \
+  /path/to/script.pl arg1 >/tmp/page.out 2>/tmp/page.err
+```
+
+Check the run: exit code `0`, `/tmp/page.err` empty (or only benign
+warnings), and the `.out` file exists and is non-trivial in size. The
+captured stdout (`/tmp/page.out`) is the output of the code in question.
+
+> Match the `file=` path to a directory the running user can write.
+> In user mode that means the user's homedir (`/home/luser/...`),
+> not `/tmp` or some other dir they may not be able to write to.
+
+## 3. Render the HTML report
+
+`nytprofhtml` writes an `nytprof/` directory **next to where you run
+it**, so `cd` to the `.out` location first:
+
+```bash
+cd "$(dirname /home/luser/nytprof.out)"        # or /tmp
+nytprofhtml --file ./nytprof.out --out ./nytprof
+ls ./nytprof/index.html
+```
+
+If the run was as another user, render as that user too (or `chown` the
+`.out` first) so permissions line up:
+`sudo -u luser nytprofhtml --file /home/luser/nytprof.out --out /home/luser/nytprof`.
+
+Copy `nytprof/` somewhere convenient to read if needed — but remember
+the [security rule](#️-security--artifacts-embed-full-source).
+
+## 4. Analyze
+
+Open `nytprof/index.html`. Reading the report:
+
+- The **flame graph**: X axis = time spent in each call stack; Y axis =
+  call-stack depth. Wide bricks are where the time goes. Click a brick
+  to drill into the source with per-line costs (in seconds / fractions).
+- The **top-subroutines** and **per-file** tables rank by exclusive and
+  inclusive time.
+
+Fast, scriptable triage without a browser — grep the report for a
+suspected module and sum its cost:
+
+```bash
+# Which modules show up, and how often
+grep -oE "DateTime[A-Za-z:/_]*" nytprof/index.html | sort | uniq -c
+
+# Headline: "Profile of <script> for <wall time>"
+grep -oE "Profile of [^<]+for [0-9.]+s" nytprof/index.html | head -1
+
+# Sum per-file load time for a module family (adjust the regex)
+perl -0777 -ne 'my $t=0; while(/<tr[^>]*>(.*?)<\/tr>/sg){my $r=$1; next unless $r=~m{DateTime[\w/]*\.pm</a>}; my @c=($r=~/<td[^>]*>(.*?)<\/td>/sg); s/<[^>]+>//g for @c; for my $c (@c){ if($c=~/([0-9.]+)(ms|µs|s)$/){my($n,$u)=($1,$2); $n*=1000 if $u eq "s"; $n/=1000 if $u eq "µs"; $t+=$n; last}}} printf "summed: %.1f ms\n",$t' nytprof/index.html
+```
+
+**The profiler inflates everything** (often 5–20×), so treat absolute
+times as *relative*. To get the real-world saving of removing/lazy-loading
+a module, measure the load cost directly, without the profiler:
+
+```bash
+./3rdparty/bin/perl -e 'use Time::HiRes qw(time); my $s=time; require DateTime; require DateTime::Format::ISO8601; printf "%.1f ms\n",(time-$s)*1000;'
+```
+
+Compare against a lightweight replacement if the culprit is a module load.
+Sometimes the only dependency you might need from a heavyweight module is
+one or two subroutines. Often there are alternatives on the CPAN that
+do what you need. In the above example, it could be argued that if all you
+needed was what strftime from POSIX could have given you, you probably
+didn't need to load all of DateTime even if it winds up being a bit more
+code to write.
+
+## 5. Common culprits → fixes
+
+- **Expensive module loaded at compile time.** A `use Heavy::Module ();`
+  at the top of a module that runs in the render/daemon path. Fixes:
+  swap for a lightweight equivalent or `require` it lazily inside
+  the one sub that needs it.
+- **Data fetched synchronously that can be fetched asynchronously**
+  Fetching something from a slow database query and blocking
+  load versus using coroutines or forking to process other things while
+  processing that slow operation.
+  Enumeration via synchronous logic "in-template" vs. asynchronous API
+  calls in JS via whatever UI your CGI/PSGI script has.
+- **Repeated work** that should be cached either to file or to memory via
+  memoization.
+
+After a fix, **re-profile the same way** and confirm the hotspot is
+gone (grep the new report; it should no longer mention the module), and
+confirm with the profiler-free load-time measurement.
+
+## 6. Clean up (always)
+
+Profiling artifacts embed source — remove them when finished:
+
+```bash
+rm -f /tmp/nytprof.out /tmp/page.out /tmp/page.err
+rm -rf /tmp/nytprof
+# realistic mode:
+rm -rf /home/cptest/nytprof.out /home/cptest/nytprof
+```
+
+If you copied the report elsewhere to read it, delete that copy too.
+
+## Troubleshooting
+
+- **`nytprofhtml: command not found`** — it's not on `PATH`; this can
+  commonly occur if perl was installed with perlbrew. Make sure the
+  PERLBREW_HOME variable is set and points to the right place.
+- **Empty / tiny `nytprof.out`** — the process died before profiling
+  flushed. Check `/tmp/page.err`; ensure the entry point and argument
+  are correct, and that `REMOTE_USER` / `sudo -u` user exists.
+- **Permission denied rendering** — the `.out` is owned by the run
+  user; render as that user (`sudo -u`) or `chown` it first, and make
+  sure `file=` was writable by the run user.
+- **`Ignoring '#line ...' directive` warnings from nytprofhtml** —
+  harmless; Template.pm compiles templates with `#line` markers that
+  don't map back cleanly. The report is still valid.
+- **Times look implausibly large** — that's profiler overhead. Use the
+  `Time::HiRes` direct measurement for real numbers.
