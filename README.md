@@ -31,6 +31,7 @@ perl:review-perl    # Static analysis with perlcritic
 | `perl:using-pvm` | (injected by setup) | PVM install + capability map |
 | `perl:require-toolchain` | (internal) | Verify backend configured |
 | `perl:detect-version` | (internal) | Detect active Perl version |
+| `perl:write-5.44` | `perl:write-perl` (dispatched) | Modern Perl 5.44 |
 | `perl:write-5.42` | `perl:write-perl` (dispatched) | Modern Perl 5.42 |
 | `perl:write-5.40` | `perl:write-perl` (dispatched) | Perl 5.40 |
 | `perl:write-5.38` | `perl:write-perl` (dispatched) | Perl 5.38 |

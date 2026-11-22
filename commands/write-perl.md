@@ -16,6 +16,7 @@ version and dispatches to the appropriate version-specific writing skill.
 
 | Detected version | Skill |
 |---|---|
+| 5.44.x | `perl:write-5.44` |
 | 5.42.x | `perl:write-5.42` |
 | 5.40.x | `perl:write-5.40` |
 | 5.38.x | `perl:write-5.38` |
@@ -27,4 +28,4 @@ version and dispatches to the appropriate version-specific writing skill.
 
 If `perl:detect-version` returns "unknown" and the user confirms a version,
 dispatch accordingly. If the user declines to specify, default to
-`perl:write-5.42` (highest available).
+`perl:write-5.44` (highest available).
