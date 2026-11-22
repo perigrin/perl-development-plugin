@@ -109,12 +109,15 @@ Once installed, use these commands:
 | Capability | Command |
 |---|---|
 | Install Perl version | `pvm install <version>` |
+| Install latest stable Perl | `pvm install latest` |
+| Available (upstream) versions | `pvm available` |
 | Switch Perl version | `PVM_PERL_VERSION=<ver>` or `.perl-version` file |
 | Current version | `pvm current` |
 | Installed versions | `pvm versions` |
 | Install CPAN module | `pvm module install <Module>` |
 | Install from cpanfile | `pvm module install` |
 | Run script isolated | `pvx <script>` |
+| Run under a specific version | `pvm run -p <version> <script>` |
 | Run tests | `pvx prove -lr t/` |
 | Parse source / AST | `psc parse <file>` |
 | Analyze dependencies | `psc analyze lib/` |
