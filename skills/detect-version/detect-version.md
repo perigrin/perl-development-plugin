@@ -67,12 +67,13 @@ when the project targets 5.40 would break compatibility.
 
 | Version range | Skill | Notes |
 |---|---|---|
+| 5.44.x | `perl:write-5.44` | Named signature parameters, ref-alias `foreach` |
 | 5.42.x | `perl:write-5.42` | `:writer`, lexical methods, `use utf8` required |
 | 5.40.x | `perl:write-5.40` | Minimum reliable `feature 'class'` |
 | 5.38.x | `perl:write-5.38` | `Feature::Compat::Class`, explicit builtins |
 | 5.36.x | `perl:write-5.36` | Signatures stable, no native class |
 | < 5.36 or CPAN dist | `perl:write-toolchain` | Broad compatibility 5.20+ |
-| Unknown | Ask; default to `perl:write-5.42` if confirmed | |
+| Unknown | Ask; default to `perl:write-5.44` if confirmed | |
 
 ## Return Value
 

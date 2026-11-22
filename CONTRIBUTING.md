@@ -17,7 +17,8 @@ skills/
   require-toolchain/    shared dependency gate for runtime skills
   using-pvm/            PVM backend: install procedure + capability map
   using-custom/         manual capability table for non-PVM setups
-  writing-perl-5.42/    modern Perl 5.42 code generation
+  writing-perl-5.44/    modern Perl 5.44 code generation
+  writing-perl-5.42/    Perl 5.42 code generation
   writing-perl-5.40/    Perl 5.40 code generation
   writing-perl-5.38/    Perl 5.38 code generation
   writing-perl-5.36/    Perl 5.36 code generation
